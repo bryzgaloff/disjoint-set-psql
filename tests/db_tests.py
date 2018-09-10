@@ -3,7 +3,7 @@ import asyncio
 
 import aiopg
 from db.credentials import PG_DSN
-from db.utils import CursorCtxManager
+from db.utils import PoolCtxManagerProxy
 
 
 class CursorCtxManagerTestCase(unittest.TestCase):
@@ -14,8 +14,8 @@ class CursorCtxManagerTestCase(unittest.TestCase):
     def test_shared_pool(self):
         async def _test():
             async with aiopg.create_pool(PG_DSN) as pool:
-                ctx_mgr_1 = CursorCtxManager(pool)
-                ctx_mgr_2 = CursorCtxManager(pool)
+                ctx_mgr_1 = PoolCtxManagerProxy(pool)
+                ctx_mgr_2 = PoolCtxManagerProxy(pool)
                 async with ctx_mgr_1:
                     async with ctx_mgr_2:
                         self.assertIs(ctx_mgr_1._pool, ctx_mgr_2._pool)
@@ -26,8 +26,8 @@ class CursorCtxManagerTestCase(unittest.TestCase):
 
     def test_non_shared_pool(self):
         async def _test():
-            ctx_mgr_1 = CursorCtxManager(dsn=PG_DSN)
-            ctx_mgr_2 = CursorCtxManager(dsn=PG_DSN)
+            ctx_mgr_1 = PoolCtxManagerProxy(dsn=PG_DSN)
+            ctx_mgr_2 = PoolCtxManagerProxy(dsn=PG_DSN)
             async with ctx_mgr_1:
                 async with ctx_mgr_2:
                     self.assertTrue(ctx_mgr_1._pool is not ctx_mgr_2._pool)
@@ -38,9 +38,9 @@ class CursorCtxManagerTestCase(unittest.TestCase):
 
     def test_nested_shared_pool(self):
         async def _test():
-            outer_ctx_mgr = CursorCtxManager(dsn=PG_DSN)
+            outer_ctx_mgr = PoolCtxManagerProxy(dsn=PG_DSN)
             async with outer_ctx_mgr:
-                inner_ctx_mgr = CursorCtxManager(outer_ctx_mgr._pool)
+                inner_ctx_mgr = PoolCtxManagerProxy(outer_ctx_mgr._pool)
                 async with inner_ctx_mgr:
                     self.assertIs(inner_ctx_mgr._pool, outer_ctx_mgr._pool)
                 self.assertFalse(outer_ctx_mgr._pool.closed)
