@@ -1,4 +1,3 @@
-from operator import itemgetter
 from itertools import groupby
 
 
@@ -29,7 +28,8 @@ class AsyncDisjointSet:
         subtree = self._subtrees[object_id]
         if object_id != subtree.root_id:
             root_subtree = self.find(subtree.root_id)
-            subtree.root_id = root_subtree.root_id  # path compression
+            subtree.update(root_subtree)  # path compression
+            subtree = root_subtree
         return subtree
 
     def union(self, x, y):
@@ -38,20 +38,17 @@ class AsyncDisjointSet:
             return
         if x_subtree.size < y_subtree.size:  # union by size
             x_subtree, y_subtree = y_subtree, x_subtree
-        y_subtree.root_id = x_subtree.root_id
         x_subtree.size = x_subtree.size + y_subtree.size
+        y_subtree.update(x_subtree)
 
     def get_components(self):
         """ Result of building disjoint-set to find connected components. """
         grouped = _sort_and_groupby(
-            (
-                (subtree.root_id, object_id)
-                for object_id, subtree in self._subtrees.items()
-            ),
-            key=itemgetter(0)
+            self._subtrees.keys(),
+            key=lambda object_id: self.find(object_id).root_id
         )
-        for root_id, pairs in grouped:
-            yield list(map(itemgetter(1), pairs))
+        for root_id, component in grouped:
+            yield list(component)
 
 
 class DisjointSetSubtree:
@@ -60,6 +57,12 @@ class DisjointSetSubtree:
     def __init__(self, root_id, size):
         self.root_id = root_id
         self.size = size
+
+    def update(self, other):
+        self.root_id, self.size = other.root_id, other.size
+
+    def __repr__(self):
+        return f'root={self.root_id}, size={self.size}'
 
 
 def _sort_and_groupby(iterable, key):
